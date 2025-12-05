@@ -1,0 +1,155 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Plinko!</title>
+<style>
+:root{
+  --bg:#041025; --accent:#ffb86b; --muted:#9fb0c8;
+}
+body{
+  margin:0; font-family:Inter,Arial,sans-serif; background:#041025; color:#e6f2ff; display:flex; justify-content:center; align-items:flex-start; padding:20px;
+}
+.wrap{display:grid; grid-template-columns:1fr 360px; gap:20px; max-width:1100px;}
+.card{background: rgba(255,255,255,0.02); border-radius:12px; padding:14px; border:1px solid rgba(255,255,255,0.03);}
+.title{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+.brand{font-weight:800; color:var(--accent); font-size:18px;}
+.small{font-size:13px; color:var(--muted);}
+.center{display:flex; justify-content:center; align-items:center;}
+canvas{border-radius:6px; background:#031022; max-width:100%;}
+.controls{display:flex; flex-direction:column; gap:12px;}
+.infoRow{display:flex; justify-content:space-between; padding:10px; border-radius:8px; background: rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.02);}
+select,input{padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:inherit;}
+.btn{padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); cursor:pointer; font-weight:700;}
+.drop{background:linear-gradient(90deg,#10b981,#06b6d4); color:#02121a; border:none;}
+.mini{font-size:13px; padding:6px 10px;}
+.slotLabels{display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="title"><div class="brand">Plinko where you can never lose</div><div class="small">Physics Board</div></div>
+    <div class="center"><canvas id="board" width="760" height="640"></canvas></div>
+  </div>
+
+  <div class="card controls">
+    <div class="infoRow"><div>Balance</div><div id="balance">1000</div></div>
+    <div class="infoRow"><div>Last Win</div><div id="lastWin">0</div></div>
+    <div class="infoRow"><div>Current Bet</div><div id="betVal">25</div></div>
+
+    <div style="display:flex; gap:8px; align-items:center;">
+      <select id="betSelect">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+        <option value="25" selected="">25</option>
+      </select>
+      <select id="ballsSelect">
+        <option value="5" selected="">5 Balls</option>
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+        <option value="25">25</option>
+      </select>
+      <button id="dropBtn" class="btn drop">Drop Ball(s)</button>
+      <button id="resetBtn" class="btn mini">Reset</button>
+    </div>
+
+    <div style="margin-top:10px;">
+      <div style="font-weight:800; margin-bottom:6px;">Bottom Slot Multipliers</div>
+      <div id="multTable"></div>
+      <div class="slotLabels" id="slotLabels"></div>
+    </div>
+
+    <div style="margin-top:8px;"><div id="status" class="small">Ready — choose bet and balls</div></div>
+  </div>
+</div>
+
+<script>
+/* Configuration */
+const START_BALANCE = 1000, CANVAS_W=760, CANVAS_H=640;
+let ROWS=10, PEG_RADIUS=6, PEG_SPACING_X=48, PEG_SPACING_Y=48, BALL_RADIUS=8, GRAVITY=0.45, FRICTION=0.995, BOUNCE=0.9;
+let bottomMultipliers=[0.2,0.5,1,2,5,10,25,50], balance=START_BALANCE, bet=25, lastWin=0;
+let balls=[], dropping=false;
+
+const canvas=document.getElementById('board'), ctx=canvas.getContext('2d');
+const balanceEl=document.getElementById('balance'), lastWinEl=document.getElementById('lastWin'), betValEl=document.getElementById('betVal');
+const betSelect=document.getElementById('betSelect'), ballsSelect=document.getElementById('ballsSelect');
+const dropBtn=document.getElementById('dropBtn'), resetBtn=document.getElementById('resetBtn');
+const statusEl=document.getElementById('status'), multTable=document.getElementById('multTable'), slotLabels=document.getElementById('slotLabels');
+let animationId=null;
+
+/* Audio */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+const audioCtx = AudioCtx ? new AudioCtx() : null;
+function beep(f=600,d=0.04,v=0.06){if(!audioCtx)return; try{const o=audioCtx.createOscillator(); const g=audioCtx.createGain(); o.type='sine'; o.frequency.value=f; g.gain.value=v; o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d);}catch(e){}}
+
+/* Pegs */
+function generatePegs(rows){const pegs=[]; const left=60,right=CANVAS_W-60; for(let r=0;r<rows;r++){const offset=(r%2===0)?0:PEG_SPACING_X/2; const y=90+r*PEG_SPACING_Y; for(let x=left+offset;x<=right-PEG_SPACING_X/2;x+=PEG_SPACING_X) pegs.push({x,y,r:PEG_RADIUS});} return pegs;}
+let pegs=generatePegs(ROWS);
+
+/* Ball factory */
+function Ball(x,y){return {x,y,vx:(Math.random()-0.5)*2,vy:1+Math.random()*1.5,r:BALL_RADIUS,stuckCounter:0,settled:false};}
+
+/* Draw */
+function clear(){ctx.clearRect(0,0,CANVAS_W,CANVAS_H);}
+function drawBoard(){const g=ctx.createLinearGradient(0,0,0,CANVAS_H); g.addColorStop(0,'#071827'); g.addColorStop(1,'#021022'); ctx.fillStyle=g; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+ctx.fillStyle='#8fb6d6'; for(const p of pegs){ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();}
+const bottomY=CANVAS_H-120; const slotCount=bottomMultipliers.length; const slotWidth=CANVAS_W/slotCount;
+ctx.fillStyle='rgba(255,255,255,0.02)'; ctx.fillRect(0,bottomY,CANVAS_W,CANVAS_H-bottomY);
+ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=2; for(let i=0;i<=slotCount;i++){const x=i*slotWidth;ctx.beginPath(); ctx.moveTo(x,bottomY); ctx.lineTo(x,CANVAS_H); ctx.stroke();}
+ctx.fillStyle='#e6f2ff'; ctx.font='bold 14px Inter, Arial'; ctx.textAlign='center'; for(let i=0;i<slotCount;i++){ctx.fillText(`${bottomMultipliers[i]}×`,(i+0.5)*slotWidth,CANVAS_H-18);}
+ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.fillRect(CANVAS_W/2-100,28,200,30); ctx.fillStyle='#bfe7ff'; ctx.font='13px Inter, Arial'; ctx.textAlign='center'; ctx.fillText('Ball release zone',CANVAS_W/2,48);
+}
+function drawBall(b){ctx.beginPath(); const grad=ctx.createRadialGradient(b.x-4,b.y-4,b.r*0.1,b.x,b.y,b.r); grad.addColorStop(0,'#fff'); grad.addColorStop(0.3,'#bdefff'); grad.addColorStop(1,'#06b6d4'); ctx.fillStyle=grad; ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(b.x,b.y+b.r*0.9,b.r*1.1,b.r*0.5,0,0,Math.PI*2); ctx.fill();}
+
+/* Physics */
+function stepPhysics(dt){balls.forEach(ball=>{if(ball.settled) return; ball.vy+=GRAVITY; ball.vx*=FRICTION; ball.x+=ball.vx; ball.y+=ball.vy;
+for(const p of pegs){const dx=ball.x-p.x,dy=ball.y-p.y,dist=Math.hypot(dx,dy); if(dist<ball.r+p.r){const nx=dx/dist,ny=dy/dist,overlap=ball.r+p.r-dist; ball.x+=nx*overlap; ball.y+=ny*overlap; const vn=ball.vx*nx+ball.vy*ny; ball.vx-=2*vn*nx; ball.vy-=2*vn*ny; ball.vx+=(Math.random()-0.5)*1.6; ball.vy*=0.95; beep(700+Math.random()*150,0.01,0.03); ball.stuckCounter=0;}} 
+const leftBound=12,rightBound=CANVAS_W-12; if(ball.x-ball.r<leftBound){ball.x=leftBound+ball.r; ball.vx=-ball.vx*BOUNCE;} 
+if(ball.x+ball.r>rightBound){ball.x=rightBound-ball.r; ball.vx=-ball.vx*BOUNCE;}
+const floorY=CANVAS_H-120; if(ball.y+ball.r>=floorY){ball.y=floorY-ball.r; ball.vy*=-0.2; if(Math.abs(ball.vx)<0.8 && Math.abs(ball.vy)<1.2) settleBall(ball);}
+if(Math.abs(ball.vx)+Math.abs(ball.vy)<0.002) ball.stuckCounter++; else ball.stuckCounter=0;
+if(ball.stuckCounter>120){ball.vx+=(Math.random()-0.5)*4; ball.vy-=2; ball.stuckCounter=0;}});}
+
+function settleBall(ball){if(ball.settled) return; ball.settled=true; const slotCount=bottomMultipliers.length; const slotWidth=CANVAS_W/slotCount; const idx=Math.min(Math.floor(ball.x/slotWidth),slotCount-1); const multiplier=bottomMultipliers[idx]||0; const payout=Math.floor(bet*multiplier); lastWin+=payout; balance+=payout; updateUI();
+if(balls.every(b=>b.settled)){dropping=false; dropBtn.disabled=false; status(`All balls settled → +${lastWin}`); balls=[];}}
+
+function drawFrame(){clear(); drawBoard(); balls.forEach(drawBall);}
+function animate(){drawFrame(); stepPhysics(1/60); if(balls.some(b=>!b.settled)) animationId=requestAnimationFrame(animate); else cancelAnimationFrame(animationId);}
+function updateUI(){balanceEl.textContent=Intl.NumberFormat().format(balance); lastWinEl.textContent=Intl.NumberFormat().format(lastWin); betValEl.textContent=bet;}
+function status(txt){statusEl.textContent=txt;}
+
+/* Multiplier table UI */
+function renderMultiplierTable(){multTable.innerHTML=''; slotLabels.innerHTML=''; bottomMultipliers.forEach((m,i)=>{const row=document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; const label=document.createElement('div'); label.textContent=`Slot ${i+1}`; label.className='small'; const input=document.createElement('input'); input.type='number'; input.step='0.1'; input.min='0'; input.value=m; input.style.width='80px'; input.addEventListener('change',e=>{bottomMultipliers[i]=Math.max(0,Number(e.target.value)); renderMultiplierTable(); drawFrame();}); row.appendChild(label); row.appendChild(input); multTable.appendChild(row);
+const lbl=document.createElement('div'); lbl.style.flex='1'; lbl.style.textAlign='center'; lbl.style.fontSize='13px'; lbl.style.color='#bfe7ff'; lbl.textContent=`${m}×`; slotLabels.appendChild(lbl);});}
+
+/* Drop balls */
+function dropBalls(){
+  if(dropping) return;
+  const count = Number(ballsSelect.value);
+  const totalCost = bet * count;
+  if(balance < totalCost){status('Insufficient balance'); return;}
+  balance -= totalCost; lastWin=0; updateUI();
+  if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+  balls=[]; for(let i=0;i<count;i++){ const x=CANVAS_W/2 + (Math.random()-0.5)*180; balls.push(Ball(x,62)); }
+  dropping=true; dropBtn.disabled=true; status('Dropping balls...'); animate();
+}
+
+/* Reset */
+function resetGame(){balance=START_BALANCE; lastWin=0; balls=[]; dropping=false; dropBtn.disabled=false; updateUI(); drawFrame(); status('Reset — ready');}
+
+/* Events */
+dropBtn.addEventListener('click',dropBalls);
+resetBtn.addEventListener('click',resetGame);
+betSelect.addEventListener('change',()=>{bet=Number(betSelect.value); updateUI();});
+ballsSelect.addEventListener('change',updateUI);
+document.addEventListener('keydown',ev=>{if(ev.code==='Space'){ev.preventDefault(); dropBalls();}});
+
+/* Init */
+renderMultiplierTable(); updateUI(); drawFrame(); status('Ready — choose bet and balls');
+</script>
+
+</body></html>

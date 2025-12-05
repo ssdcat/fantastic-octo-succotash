@@ -1,0 +1,514 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mines!</title>
+<style>
+  :root{
+    --bg:#071027; --card:#071427; --accent:#06b6d4; --danger:#ef4444;
+    --muted:#9ab0c6; --glass: rgba(255,255,255,0.02);
+    --success:#10b981; --tile-size:56px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%; margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial; background:
+    linear-gradient(180deg,#031024 0%, #041427 100%); color:#e9f3fb; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale}
+  .wrap{max-width:1000px;margin:26px auto;padding:18px;}
+  header{display:flex;gap:16px;align-items:center;justify-content:space-between}
+  h1{font-size:20px;margin:0}
+  .card{background:linear-gradient(180deg,var(--card),#041027); border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(2,6,23,.6);border:1px solid rgba(255,255,255,0.03)}
+  .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .control{display:flex;flex-direction:column;gap:6px;min-width:150px}
+  label{font-size:12px;color:var(--muted)}
+  input[type="number"], select, button{background:var(--glass);border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:inherit}
+  input[type="number"]::placeholder{color:var(--muted)}
+  .balance{font-weight:800;font-size:18px;color:var(--accent)}
+  .grid-wrap{margin-top:18px;display:grid;gap:14px;grid-template-columns:1fr 360px}
+  @media(max-width:900px){.grid-wrap{grid-template-columns:1fr}}
+  .board-card{padding:12px;border-radius:12px;min-height:280px}
+  .board{background:linear-gradient(180deg,#071827,#04111a);padding:12px;border-radius:10px;display:grid;gap:8px;justify-content:center;align-content:start;align-items:center}
+  .tile{
+    width:var(--tile-size); height:var(--tile-size);
+    border-radius:10px;background:linear-gradient(180deg,#041827,#02212a);display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:18px;color:transparent;border:1px solid rgba(255,255,255,0.04);cursor:pointer;user-select:none;
+    transition:transform .08s ease, background .12s ease, color .12s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45) inset;
+  }
+  .tile:active{transform:scale(.98)}
+  .tile.safe{background:linear-gradient(180deg,#0f4a3f,#0b3b33); color:#e6fffa}
+  .tile.bomb{background:linear-gradient(180deg,#5b1111,#7a1414); color:#fff}
+  .tile.revealed{cursor:default; border:1px solid rgba(255,255,255,0.06)}
+  .stats{display:flex;gap:12px;flex-direction:column}
+  .big{font-size:18px;font-weight:700}
+  .controls-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{padding:10px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+  .btn-primary{background:linear-gradient(90deg,var(--accent),#0ea5b7);color:#021017}
+  .btn-danger{background:linear-gradient(90deg,var(--danger),#ff6b6b);color:white}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+  .muted{color:var(--muted);font-size:13px}
+  .log{margin-top:12px;font-size:13px;color:var(--muted);min-height:36px}
+  .footer{margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.03)}
+  .small-muted{font-size:12px;color:var(--muted)}
+  .center{display:flex;align-items:center;justify-content:center}
+  .flash{animation:flash .7s ease}
+  @keyframes flash{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
+  footer.note{margin-top:16px;color:var(--muted);font-size:12px}
+  /* responsive tile scaling for small screens */
+  @media (max-width:420px){
+    :root{--tile-size:44px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="margin-bottom:14px;">
+    <div>
+      <h1>Mines!</h1>
+      <h2>Refresh the page to restart to $100</h2>
+      <div class="muted">Click safe tiles to grow your payout. Hit a bomb and you lose the round.</div>
+    </div>
+    <div class="chip">Balance: <span id="balance" class="balance">$100.00</span></div>
+  </header>
+
+  <div class="card">
+    <div class="controls">
+      <div class="control">
+        <label>Bet amount</label>
+        <input id="bet" type="number" min="0.5" step="0.5" value="5">
+        <div class="small-muted">Virtual currency (demo only).</div>
+      </div>
+
+      <div class="control">
+        <label>Grid size</label>
+        <select id="gridSize">
+          <option value="5">5 × 5 (25)</option>
+          <option value="6">6 × 6 (36)</option>
+          <option value="7">7 × 7 (49)</option>
+          <option value="8">8 × 8 (64)</option>
+          <option value="10">10 × 10 (100)</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label>Bombs</label>
+        <div class="controls-row">
+          <input id="bombCount" type="number" min="1" max="99" step="1" value="3" style="width:96px">
+          <button id="autoBomb" class="btn btn-ghost" title="Pick a safe default bomb count">Auto</button>
+        </div>
+        <div class="small-muted">More bombs = higher reward but higher risk.</div>
+      </div>
+
+      <div class="control">
+        <label>House edge (%)</label>
+        <input id="houseEdge" type="number" min="80" max="100" step="0.1" value="97">
+      </div>
+
+      <div style="margin-left:auto" class="control">
+        <label>&nbsp;</label>
+        <div style="display:flex;gap:8px;">
+          <button id="startBtn" class="btn btn-primary">Start Round</button>
+          <button id="cashoutBtn" class="btn btn-danger" disabled="">Cash Out</button>
+        </div>
+        <div class="small-muted" style="margin-top:6px">Start, reveal tiles, or cash out at any time.</div>
+      </div>
+    </div>
+
+    <div class="grid-wrap" style="margin-top:18px">
+      <div class="board-card card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <div class="muted">Round</div>
+            <div id="roundInfo" class="big">Not started</div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted">Potential Cashout</div>
+            <div id="payout" class="big">$0.00</div>
+            <div class="muted" style="font-size:12px">Multiplier: <span id="mult">x0.00</span></div>
+          </div>
+        </div>
+
+        <!-- BOARD: gridTemplateColumns is set dynamically in JS below -->
+        <div id="board" class="board" aria-live="polite" role="grid" aria-label="Game board"></div>
+
+        <div class="log" id="log">No round yet.</div>
+      </div>
+
+      <div class="card" style="min-height:280px;display:flex;flex-direction:column;justify-content:space-between;padding:14px">
+        <div class="stats">
+          <div>
+            <div class="muted">Selected</div>
+            <div id="selectedCount" class="big">0 tiles</div>
+          </div>
+
+          <div>
+            <div class="muted">Bombs set</div>
+            <div id="bombsSet" class="big">—</div>
+          </div>
+
+          <div>
+            <div class="muted">Tiles remaining</div>
+            <div id="tilesLeft" class="big">—</div>
+          </div>
+
+          <div>
+            <div class="muted">Round history</div>
+            <div id="history" class="muted small">Wins: 0 • Losses: 0</div>
+          </div>
+
+          <div style="margin-top:6px">
+            <div class="muted">Balance control</div>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <input id="setBalance" type="number" min="0" step="1" value="100" style="width:120px">
+              <button id="applyBalance" class="btn btn-ghost">Apply</button>
+            </div>
+            <div class="small-muted">Set your starting balance (virtual).</div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="muted">Rules</div>
+          <ul class="small-muted" style="margin:8px 0 0 18px;line-height:1.35">
+            <li>Pick tiles. Each safe tile increases payout.</li>
+            <li>Hit a bomb and you lose the bet and any in-round gains.</li>
+            <li>Cash out any time to collect the current payout (bet is locked at round start).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="muted">Demo only. No real money.</div>
+      <div class="muted">Tip: match bombs to grid size for balanced play.</div>
+    </footer>
+  </div>
+
+  <footer class="note">Single-file demo. Copy to `mines-fixed.html` and open in a modern browser.</footer>
+</div>
+
+<script>
+/* -------------------------------------------------------
+   Safe Tap — Fully rewritten single-file Mines-style game
+   - Grid columns are set dynamically in JS (no hard-coded CSS columns)
+   - Uses crypto.getRandomValues for RNG
+   - Clean state management to avoid double-click/glitches
+   - Clear tile visuals and responsive tile size
+   --------------------------------------------------------- */
+
+(function(){
+  // Helpers
+  const $ = id => document.getElementById(id);
+  const fmt = n => (Math.round(n*100)/100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  const rndInt = (max) => {
+    // secure RNG in [0, max)
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    return arr[0] % max;
+  };
+
+  // Elements
+  const balanceEl = $('balance');
+  const betEl = $('bet');
+  const gridSizeEl = $('gridSize');
+  const bombCountEl = $('bombCount');
+  const autoBombBtn = $('autoBomb');
+  const houseEdgeEl = $('houseEdge');
+  const startBtn = $('startBtn');
+  const cashoutBtn = $('cashoutBtn');
+  const boardEl = $('board');
+  const payoutEl = $('payout');
+  const multEl = $('mult');
+  const roundInfoEl = $('roundInfo');
+  const logEl = $('log');
+  const selectedCountEl = $('selectedCount');
+  const bombsSetEl = $('bombsSet');
+  const tilesLeftEl = $('tilesLeft');
+  const historyEl = $('history');
+  const setBalanceEl = $('setBalance');
+  const applyBalanceBtn = $('applyBalance');
+
+  // State
+  let state = {
+    balance: 100.00,
+    inRound: false,
+    gridSize: 5,
+    totalTiles: 25,
+    bombs: 3,
+    bombPositions: new Set(),
+    revealed: new Set(), // safe tiles revealed
+    bet: 5.00,
+    houseEdgePct: 97.0,
+    roundNumber: 0,
+    wins: 0,
+    losses: 0
+  };
+
+  // ---- UTILITY FUNCTIONS ----
+  function syncUI(){
+    balanceEl.textContent = '$' + fmt(state.balance);
+    betEl.value = state.bet;
+    gridSizeEl.value = state.gridSize;
+    bombCountEl.value = state.bombs;
+    houseEdgeEl.value = state.houseEdgePct;
+    setBalanceEl.value = Math.round(state.balance);
+    bombsSetEl.textContent = state.bombs;
+    selectedCountEl.textContent = state.inRound ? state.revealed.size + ' tiles' : '0 tiles';
+    tilesLeftEl.textContent = state.inRound ? (state.totalTiles - (state.revealed.size) - (state.bombPositions.size)) + ' safe left' : '—';
+    historyEl.textContent = `Wins: ${state.wins} • Losses: ${state.losses}`;
+
+    if(!state.inRound){
+      startBtn.disabled = false;
+      cashoutBtn.disabled = true;
+      roundInfoEl.textContent = 'Not started';
+      payoutEl.textContent = '$0.00';
+      multEl.textContent = 'x0.00';
+    } else {
+      startBtn.disabled = true;
+      cashoutBtn.disabled = false;
+      roundInfoEl.textContent = `Round #${state.roundNumber}`;
+    }
+  }
+
+  // Create empty board DOM (tiles)
+  function makeBoardDOM(){
+    boardEl.innerHTML = '';
+    const n = state.gridSize;
+    state.totalTiles = n * n;
+    // Set grid columns dynamically here (THIS IS THE FIX)
+    // The JS controls how many columns the board shows, so CSS never gets out-of-sync.
+    boardEl.style.gridTemplateColumns = `repeat(${n}, var(--tile-size))`;
+    boardEl.setAttribute('aria-rowcount', n);
+    boardEl.setAttribute('aria-colcount', n);
+
+    for(let i=0;i<state.totalTiles;i++){
+      const tile = document.createElement('button');
+      tile.className = 'tile';
+      tile.dataset.index = i;
+      tile.setAttribute('role','gridcell');
+      tile.setAttribute('aria-label', `Tile ${i+1}`);
+      tile.addEventListener('click', onTileClick);
+      tile.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tile.click(); }
+      });
+      boardEl.appendChild(tile);
+    }
+  }
+
+  // Place bombs using secure random sampling (partial Fisher-Yates selection)
+  function placeBombs(){
+    state.bombPositions = new Set();
+    const N = state.totalTiles;
+    const B = Math.max(1, Math.min(state.bombs, N - 1));
+    const idxs = Array.from({length: N}, (_,i) => i);
+    // partial shuffle to pick first B items
+    for(let i=0;i<B;i++){
+      const j = i + rndInt(N - i);
+      const t = idxs[i]; idxs[i] = idxs[j]; idxs[j] = t;
+      state.bombPositions.add(idxs[i]);
+    }
+  }
+
+  // survivalProbability for k safe reveals (k is number of safe tiles already revealed)
+  function survivalProbability(k){
+    const N = state.totalTiles;
+    const B = state.bombs;
+    if(k > (N - B)) return 0;
+    let p = 1;
+    for(let i=0;i<k;i++){
+      p *= ( (N - B - i) / (N - i) );
+    }
+    return p;
+  }
+
+  // multiplier for k safe reveals
+  function multiplierFor(k){
+    const surv = survivalProbability(k);
+    if(surv <= 0) return 0;
+    const inv = 1 / surv;
+    const hf = (Number(state.houseEdgePct) || 97) / 100;
+    // clamp to avoid runaway numbers for tiny probabilities
+    const raw = inv * hf;
+    return Math.min(raw, 1000000);
+  }
+
+  function updatePayoutDisplay(){
+    const k = state.revealed.size;
+    const mult = multiplierFor(k);
+    const bet = Number(state.bet) || 0;
+    const payout = bet * mult;
+    multEl.textContent = 'x' + (Math.round(mult*100)/100).toFixed(2);
+    payoutEl.textContent = '$' + fmt(payout);
+  }
+
+  // start round
+  function startRound(){
+    if(state.inRound) return;
+    const bet = Math.max(0.5, Number(betEl.value) || 0);
+    if(bet > state.balance){
+      alert('Bet cannot exceed your balance.');
+      return;
+    }
+    const g = Number(gridSizeEl.value) || 5;
+    const maxBomb = Math.max(1, (g*g)-1);
+    let b = Number(bombCountEl.value) || 1;
+    b = Math.max(1, Math.min(b, maxBomb));
+    const house = Math.max(80, Math.min(Number(houseEdgeEl.value) || 97, 100));
+
+    state.gridSize = g;
+    state.bombs = b;
+    state.houseEdgePct = house;
+    state.bet = bet;
+
+    // lock bet (deduct up-front)
+    state.balance = Math.round((state.balance - bet) * 100) / 100;
+
+    // init round state
+    state.inRound = true;
+    state.roundNumber++;
+    state.revealed = new Set();
+
+    makeBoardDOM();     // recreate empty tiles
+    placeBombs();       // pick bombs
+    // ensure tiles are enabled
+    Array.from(boardEl.children).forEach(t => { t.disabled = false; t.className='tile'; t.textContent = ''; });
+
+    // UI
+    logEl.textContent = `Round started — Bet $${fmt(bet)} • Board ${g}×${g} • ${b} bombs placed.`;
+    syncUI();
+    updatePayoutDisplay();
+  }
+
+  // end round: win true if cashed out; payoutCollected adds to balance when win
+  function endRound(win, payoutCollected){
+    // reveal all tiles clearly
+    const tiles = boardEl.querySelectorAll('.tile');
+    tiles.forEach((t, i) => {
+      const idx = Number(t.dataset.index);
+      t.disabled = true;
+      if(state.bombPositions.has(idx)){
+        t.classList.add('bomb','revealed');
+        t.textContent = '💣';
+      } else {
+        t.classList.add('safe','revealed');
+        // show checkmark for revealed safe tiles, blank for others
+        t.textContent = state.revealed.has(idx) ? '✓' : '';
+      }
+    });
+
+    state.inRound = false;
+    if(win && payoutCollected > 0){
+      state.balance = Math.round((state.balance + payoutCollected) * 100) / 100;
+      state.wins++;
+      logEl.textContent = `Cashed out: collected $${fmt(payoutCollected)}.`;
+    } else if(!win){
+      state.losses++;
+      logEl.textContent = `Boom — you hit a bomb and lost your bet.`;
+    }
+    syncUI();
+  }
+
+  // cash out action
+  function cashOut(){
+    if(!state.inRound) return;
+    const k = state.revealed.size;
+    const mult = multiplierFor(k);
+    const payout = Math.round((Number(state.bet) * mult) * 100) / 100;
+    endRound(true, payout);
+  }
+
+  // tile click handler
+  function onTileClick(e){
+    if(!state.inRound) return;
+    const tile = e.currentTarget;
+    const idx = Number(tile.dataset.index);
+    if(state.revealed.has(idx) || tile.classList.contains('revealed')) return; // ignore repeated
+    // reveal tile
+    if(state.bombPositions.has(idx)){
+      // bomb: show then lose
+      tile.classList.add('revealed','bomb');
+      tile.textContent = '💣';
+      // small delay so user sees tile before entire board reveals
+      setTimeout(()=> endRound(false, 0), 250);
+      return;
+    } else {
+      tile.classList.add('revealed','safe');
+      tile.textContent = '✓';
+      state.revealed.add(idx);
+      // update displays
+      syncUI();
+      updatePayoutDisplay();
+      // tiny visual pop
+      tile.classList.add('flash');
+      setTimeout(()=> tile.classList.remove('flash'), 400);
+    }
+  }
+
+  // auto-bomb: choose about ~12% of tiles (rounded) as default
+  function autoBomb(){
+    const n = state.gridSize * state.gridSize;
+    const b = Math.max(1, Math.round(n * 0.12));
+    bombCountEl.value = Math.min(b, n - 1);
+  }
+
+  // events
+  startBtn.addEventListener('click', startRound);
+  cashoutBtn.addEventListener('click', cashOut);
+  autoBombBtn.addEventListener('click', autoBomb);
+
+  gridSizeEl.addEventListener('change', () => {
+    state.gridSize = Number(gridSizeEl.value) || 5;
+    makeBoardDOM();
+    updatePayoutDisplay();
+    syncUI();
+  });
+
+  bombCountEl.addEventListener('change', () => {
+    const max = state.gridSize * state.gridSize - 1;
+    let b = Math.max(1, Math.min(Number(bombCountEl.value) || 1, max));
+    bombCountEl.value = b;
+    state.bombs = b;
+    syncUI();
+    updatePayoutDisplay();
+  });
+
+  houseEdgeEl.addEventListener('change', () => {
+    state.houseEdgePct = Math.max(80, Math.min(Number(houseEdgeEl.value) || 97, 100));
+    houseEdgeEl.value = state.houseEdgePct;
+    updatePayoutDisplay();
+  });
+
+  betEl.addEventListener('change', () => {
+    state.bet = Math.max(0.5, Number(betEl.value) || 0);
+    betEl.value = state.bet;
+    updatePayoutDisplay();
+  });
+
+  applyBalanceBtn.addEventListener('click', () => {
+    const v = Math.max(0, Number(setBalanceEl.value) || 0);
+    state.balance = Math.round(v * 100) / 100;
+    syncUI();
+  });
+
+  // keyboard shortcuts: Space to start (when not in a round), C to cash out (when in a round)
+  document.addEventListener('keydown', (e) => {
+    if(e.key === ' ' && !state.inRound){
+      e.preventDefault();
+      startRound();
+    }
+    if((e.key === 'c' || e.key === 'C') && state.inRound){
+      e.preventDefault();
+      cashOut();
+    }
+  });
+
+  // initialize
+  makeBoardDOM();
+  syncUI();
+  updatePayoutDisplay();
+
+  // expose internal for debugging (optional)
+  window.__safeTap = {
+    state, startRound, cashOut, multiplierFor, survivalProbability
+  };
+})();
+</script>
+
+</body></html>

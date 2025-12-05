@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=B612+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cutive+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sixtyfour&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Honk&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Sixtyfour+Convergence&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Ballet:opsz@16..72&display=swap');
+@keyframes rainbow {
+    25% {color: rgb(255, 0, 0);}
+    50% {color: rgb(0, 255, 0);}
+    75% {color: rgb(0, 0, 255);}
+}
+@keyframes bg-rainbow {
+    25% {background-color: rgb(255, 0, 0);}
+    50% {background-color: rgb(0, 255, 0);}
+    75% {background-color: rgb(0, 0, 255);}
+}
+body {
+    background-color:#3e3e3e;
+    /*background-image: url("https://img.freepik.com/free-vector/abstract-pattern-design_1053-525.jpg");*/
+    background-image: url("");
+    background-size: cover;
+    background-attachment: fixed;
+    /*
+    animation-name: bg-rainbow;
+    animation-iteration-count: infinite;
+    animation-duration: 5s;*/
+    user-select: none;
+}
+
+#bckgrndblur {
+    width: 100%;
+    height: 100%;
+    backdrop-filter: blur(25px);
+    position: fixed;
+    z-index: -988;
+}
+
+* {
+    font-family: "Inter";
+    color: #fffffe;
+}
+
+#embed {
+    margin-left: 5px;
+    height:606px;
+    width: calc(100% - 20px);
+}
+
+.center {text-align: center;}
+
+.sameline {
+    display: inline-block;
+    color: white;
+}
+
+#marq {
+    color: #ffffff;
+    font-family:"Inter";
+    font-weight:bold;
+}
+
+button {
+    color:white;
+    background-color:#6b646e;
+    display:inline-block;
+}
+
+input {
+    color:black;
+    background-color:#6b646e;
+}
+
+select {
+    color:white;
+    background-color:#6b646e;
+}
+
+#codeTBox {color:white;}
+
+optgroup, option {
+    cursor: cell;
+}
+
+.slcent {
+    text-align: center;
+    display: inline-block;
+}
+
+/* i havent touched this sh*t in AGES bro
+its so dusty lol */
+#menuBar {
+    top: 47;
+    background-color: rgba(134,12,200, 0.6);;
+    border: 4px solid rgba(134,12,200, 0.6);
+    text-align: center;
+    border-radius: 4px;
+    float:right; 
+    position: sticky;
+}
+
+p {
+    font-size:1em;
+}
+
+code {
+  font-family: Consolas,"Inter";
+  color: black;
+  background-color: #a4a4a6;
+  padding: 2px;
+  font-size: 105%;
+  border-radius: 10px;
+}
+
+.THEDIV {
+    background-color: #2f2e30;
+    margin: 75px;
+    border: 4px solid #f1f1f1;
+    border-spacing: 1px;
+    border-radius: 25px;
+}
+
+hr {
+    width: 95%;
+}
+
+iframe {
+    border: 10px solid rgba(0, 0, 0, 0.001);
+    border-radius: 25px;
+    -webkit-background-clip: padding-box;
+    background-clip: padding-box;
+}
+
+h1 {
+    animation-name: rainbow;
+    animation-iteration-count: infinite;
+    animation-duration: 4s;
+    font-family: "Honk", system-ui;
+    font-size: 60px;
+    margin-top: 0;
+    margin-bottom: 0;
+    font-variation-settings: "MORF" 33, "SHLN" 50;
+}
+
+.honk-h2 {
+    animation-name: rainbow;
+    animation-iteration-count: infinite;
+    animation-duration: 4s;
+    font-family: "Honk", system-ui;
+    font-size: 40px;
+    margin-top: 0;
+    margin-bottom: 0;
+    font-variation-settings: "MORF" 33, "SHLN" 50;
+}
+
+.center-img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  border: 0px solid;
+  border-radius: 8px;
+}
+::selection {
+    background: #ffffff;
+    color: black;
+}
+::-moz-selection {
+    background: #ffffff;
+    color: black;
+}
+.gradientDiv {
+    border-image: linear-gradient(#000000, #ffffff) 30;
+    border-width: 4px;
+    border-style: solid;
+}
+a {
+    text-decoration: underline dotted;
+    font-family: "Inter";
+}
+#jim {
+    font-family: "Inter";
+    font-size: 0.75em;
+}

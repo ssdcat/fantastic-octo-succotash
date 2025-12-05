@@ -1,0 +1,10 @@
+@font-face {
+  font-family: 'Honk';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/honk/v6/m8J7jftUea-XwTaemClumrBQbmvynOmXBji9zFhHRr8WFgVLow.ttf) format('truetype');
+}
+body {
+  --google-font-color-honk:none;
+}
